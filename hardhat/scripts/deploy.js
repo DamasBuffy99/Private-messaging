@@ -12,17 +12,17 @@ async function main() {
   const address2 = SECOND_ADDRESS;
   const address3 = THIRD_ADDRESS;
   
-  const privateMessagerieContract = await ethers.getContractFactory("privateMessagerie");
-  const deployedPrivateMessagerieContract = await privateMessagerieContract.deploy(
-    address1,
-    address2,
-    address3
+  const privateMessagingContract = await ethers.getContractFactory("privateMessaging");
+  const deployedPrivateMessagingContract = await privateMessagingContract.deploy(
+    "0x2f4CeD9de445D0307F755E8056712bEdD284c5Bc",
+    "0x359B25770754Fe31c8fCd5B64C01273FFE725A0a",
+    "0x45D514682afaf49d3B31dc5544945E3058f9EEF1"
   );
 
-  await deployedPrivateMessagerieContract.deployed();
+  await deployedPrivateMessagingContract.deployed();
 
   console.log(
-    `Private Messagerie Contract deployed to ${deployedPrivateMessagerieContract.address}`
+    `Private Messaging Contract deployed to ${deployedPrivateMessagingContract.address}`
   );
 }
 

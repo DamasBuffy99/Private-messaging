@@ -6,52 +6,63 @@ import {abi, PRIVATE_MESSAGERIE_CONTRACT_ADDRESS} from "../constants";
 import styles from '../styles/Home.module.css';
 
 export default function Home() {
-  const [walletConnected, setWalletConnected] = useState(false);
   const [member,setMember] = useState(false);
-  const [banned,setBanned] = useState(false);
+  const [walletConnected, setWalletConnected] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [numMember, setNumMember] = useState("0");
+  const [numberMember, setNumberMember] = useState("0");
+  const [numberMessages, setNumberMessages] = useState("0");
   const [address, setAddress] = useState("");
   const [text, setText] = useState("");
+  const [messages, setMessages] = useState([]);
   const web3ModalRef = useRef();
 
-  const addNewMember = async () =>{
+  const connectWallet = async () => {
+    try {
+      await getProviderOrSigner();
+      setWalletConnected(true);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const addNewMember = async (address) =>{
     try{
       const signer = await getProviderOrSigner(true);
       const messagerieContract = new Contract(PRIVATE_MESSAGERIE_CONTRACT_ADDRESS, abi, signer);
-      const tx = await messagerieContract.addNewMember();
+      const tx = await messagerieContract.addNewMember(address);
       setLoading(true);
       await tx.wait();
+      await getNumMemb();
       setLoading(false);
       window.alert("You sucessfully send your voice to add a new member");
-      await checkIfIsMember();
     }catch(err){
       console.error(err);
     }  
   }
 
-  const sendWarning = async () =>{
+  const sendWarning = async (address) =>{
     try{
       const signer = await getProviderOrSigner(true);
       const messagerieContract = new Contract(PRIVATE_MESSAGERIE_CONTRACT_ADDRESS, abi, signer);
-      const tx = await messagerieContract.sendWarning();
+      const tx = await messagerieContract.sendWarning(address);
       setLoading(true);
       await tx.wait();
+      await getNumMemb();
       setLoading(false);
       window.alert("You sucessfully send a warning to a member");
-      await checkIfIsMember();
     }catch(err){
       console.error(err);
     }
   }
 
-  const sendMessage = async () =>{
+  const sendMessage = async (message) =>{
     try{
       const signer = await getProviderOrSigner(true);
       const messagerieContract = new Contract(PRIVATE_MESSAGERIE_CONTRACT_ADDRESS, abi, signer);
-      const tx = await messagerieContract.sendMessage();
+      const tx = await messagerieContract.sendMessage(message);
       setLoading(true);
       await tx.wait();
+      await getNumMessages();
       setLoading(false);
       window.alert("You sucessfully send a message");
     }catch(err){
@@ -59,7 +70,38 @@ export default function Home() {
     }
   }
 
-  const readMessage = async () =>{
+  const fetchMessageById = async (id) =>{
+    try{
+      const provider = await getProviderOrSigner();
+      const messagerieContract = new Contract(PRIVATE_MESSAGERIE_CONTRACT_ADDRESS, abi, provider);
+      const message = await listMessages(id);
+      const parsedMessage = {
+        messageId : id,
+        author: message.author.toString(),
+        text:message.text.toString(),
+        date:new Date(parseInt(message.date.toString())*1000)
+      }
+      return parsedMessage;
+    }catch(err){
+      console.error(err);
+    }
+  } 
+
+  const fetchAllMessages = async () =>{
+    try{
+      const listMessages = [];
+      for(let i=0; i<numberMessages;i++){
+        const message = await fetchMessageById(i);
+        listMessages.push(message);
+      }
+      setMessages(listMessages);
+      return listMessages;
+    }catch(err){
+      console.error(err);
+    }
+  }
+
+  /*const readMessage = async () =>{
     try{
       const provider = await getProviderOrSigner(false);
       const messagerieContract = new Contract(PRIVATE_MESSAGERIE_CONTRACT_ADDRESS, abi, provider);
@@ -68,13 +110,35 @@ export default function Home() {
     }catch(err){
       console.error(err);
     }
+  }*/
+
+  const getNumMemb = async () =>{
+    try{
+      const provider = await getProviderOrSigner();
+      const messagerieContract = new Contract(PRIVATE_MESSAGERIE_CONTRACT_ADDRESS, abi, provider);
+      const numberMember = await messagerieContract.numberMember();
+      setNumberMember(numberMember.toString());
+    }catch(err){
+      console.error(err);
+    }
   }
 
-  const changeMemberName = async () =>{
+  const getNumMessages = async () =>{
+    try{
+      const provider = await getProviderOrSigner();
+      const messagerieContract = new Contract(PRIVATE_MESSAGERIE_CONTRACT_ADDRESS, abi, provider);
+      const numberMessages = await messagerieContract.numberMessages();
+      setNumberMessages(numberMessages.toString());
+    }catch(err){
+      console.error(err);
+    }
+  }
+
+  const changeMemberName = async (text) =>{
     try{
       const signer = await getProviderOrSigner(true);
       const messagerieContract = new Contract(PRIVATE_MESSAGERIE_CONTRACT_ADDRESS, abi, signer);
-      const tx = await messagerieContract.changeMemberName();
+      const tx = await messagerieContract.changeMemberName(text);
       setLoading(true);
       await tx.wait();
       setLoading(false);
@@ -86,9 +150,13 @@ export default function Home() {
 
   const checkIfIsMember = async () => {
     try{
-      const provider = await getProviderOrSigner(false);
-      const messagerieContract = new Contract(PRIVATE_MESSAGERIE_CONTRACT_ADDRESS, abi, provider);
-      const bool = await messagerieContract.check();
+      const signer = await getProviderOrSigner(true);
+      const messagerieContract = new Contract(PRIVATE_MESSAGERIE_CONTRACT_ADDRESS, abi, signer);
+      const address = await signer.getAddress();
+      const bool = await messagerieContract.checkIfIsMember(address);
+      if(bool){
+        setMember(true);
+      }
     }catch(err){
       console.error(err);
     }
@@ -119,13 +187,12 @@ export default function Home() {
         providerOptions: {},
         disableInjectedProvider: false,
       });
-      setWalletConnected();
-
-      const _member = checkIfIsMember();
-      //set an interval to get the messages 
-      setInterval(async function(){
-        await readMessage;
-      }, 5*1000);
+      connectWallet().then(()=>{
+        checkIfIsMember();
+        getNumMemb();
+        getNumMessages();
+        fetchAllMessages();
+      });
     }
   },[walletConnected]);
 
@@ -147,35 +214,56 @@ export default function Home() {
         </div>
       );
     }
-    if(banned){
-      return(
-        <div className={styles.description}>
-          Who are you guy! You can't get access to the family. You are banned! What are you do ?
-        </div>
-      );
-    }
+
     if(member){
       return(
       <div>
         <div className={styles.description}>
-          Welcome to the family
+          Welcome back to the family
         </div>
         <div style={{ display: "flex-col" }}>
           <div>
             <input
-              type="number"
+              type="text"
               placeholder="Address"
               // BigNumber.from converts the `e.target.value` to a BigNumber
-              onChange={(e) => setTokenAmount(BigNumber.from(e.target.value))}
+              onChange={(e) => setAddress(e.target.value)}
               className={styles.input}
             />
           </div>
           <button
-            className={styles.button}
-            disabled={!(tokenAmount > 0)}
-            onClick={() => mintCryptoDevToken(tokenAmount)}
+            /*className={styles.button}
+            disabled={!(address > 0)}*/
+            onClick={() => addNewMember(address)}
           >
-            Mint Tokens
+            Add New Member
+          </button>
+          <button
+            /*className={styles.button}
+            disabled={!(address > 0)}*/
+            onClick={() => sendWarning(address)}
+          >
+            Send a warning to this member
+          </button>
+        </div>
+        
+
+        <div style={{ display: "flex-col" }}>
+          <div>
+            <input
+              type="text"
+              placeholder="Write your message"
+              // BigNumber.from converts the `e.target.value` to a BigNumber
+              onChange={(e) => setText(e.target.value)}
+              className={styles.input}
+            />
+          </div>
+          <button
+            /*className={styles.button}
+            disabled={!(text > 0)}*/
+            onClick={() => sendMessage(text)}
+          >
+            Push your Message
           </button>
         </div>
       </div>
@@ -183,10 +271,39 @@ export default function Home() {
     }
   };
 
+  const rend = () =>{
+    if (member && numberMessages === 0){
+      return(
+        <div className={styles.description}>There are any message yet</div>
+      );
+    }
+
+    if (member && numberMessages != 0){
+      return(
+        <div>
+            {messages.map((p,index) =>{
+              <div key={index}>
+                <p>Message ID: {p.messageId.toLocaleString()}</p>
+                <p>author: {p.author}</p>
+                <p>Text: {p.text}</p>
+                <p>Date: {p.date}</p>
+              </div>
+            })}
+          </div>
+      );
+    }
+
+    if (5){
+      return(
+        <div className={styles.description}>7</div>
+      );
+    }
+  }
+
   return (
     <div>
       <Head>
-        <title>Private Messagerie</title>
+        <title>Private Messaging</title>
         <meta name="description" content="Generated by create next app" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
@@ -198,9 +315,11 @@ export default function Home() {
             It's a space for our family
           </div>
           <div className={styles.description}>
-            There are {numMember} members on the family at this moment.
+            There are {numberMember.toString()} members on the family at this moment.
+            There are {numberMessages.toString()} messages sent by this channel.
           </div>
           {renderButtom()}
+          {rend()}
         </div>
         <div>
           <img className={styles.image} src="/ABClogo.jpg" />
@@ -208,7 +327,7 @@ export default function Home() {
       </main>
 
       <footer className={styles.footer}>
-        Made with &#10084; by ABC Group 7
+        Made with &#10084; by ABC Group L
       </footer>
     </div>
   )

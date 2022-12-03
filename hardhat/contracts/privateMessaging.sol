@@ -5,7 +5,7 @@ pragma solidity ^0.8.9;
 // import "hardhat/console.sol";
 
 
-contract privateMessagerie{
+contract privateMessaging{
     //Only the members of the family can read and write data through this smart-contract
     mapping(address=>bool) public addressSaved;
     mapping(address => uint) public pendingToBeAdded;
@@ -14,11 +14,12 @@ contract privateMessagerie{
     event messageSent (address _sender);
     event memberBanned (address _member);
     uint public numberMember = 3;
+    uint8 public x;
 
     struct Member{
         bytes32 name; //short name : up to 32 bytes
-        uint numMessages;
-        uint warning; //3 avertissements => renvoyé de la famille
+        uint8 warning;
+        uint8 numMessagesSend;
     }
     mapping(address => Member) public Members;
     mapping(address =>mapping(address=>bool)) public warner;
@@ -28,7 +29,8 @@ contract privateMessagerie{
         string text;
         uint date;
     }
-    Message[] public listMessages;
+    mapping(uint8 => Message) public listMessages;
+    uint public numberMessages;
 
     constructor(address _member1, address _member2, address _member3){
         addressSaved[_member1] = true;
@@ -69,20 +71,24 @@ contract privateMessagerie{
     }
 
     function sendMessage(string memory _message) public onlyMember{
-        listMessages.push(Message({
+        listMessages[x] = Message({
             author:msg.sender,
             text: _message,
             date: block.timestamp
-        }));
+        });
+        x++;
         emit messageSent(msg.sender);
-    }
-
-    function readMessage() public view onlyMember returns(Message[] memory){
-        return listMessages;
-    }
-
-    function changeMemberName(bytes32 name) public onlyMember{
+        numberMessages++;
         Member storage mem = Members[msg.sender];
+        mem.numMessagesSend++;
+    }
+
+    /*function readMessage() public view onlyMember returns(Message[] memory){
+        return listMessages;
+    }*/
+
+    function changeMemberName(bytes32 name, address _member) public onlyMember{
+        Member storage mem = Members[_member];
         mem.name = name;
     }
 
@@ -90,8 +96,11 @@ contract privateMessagerie{
         return numberMember;
     }
 
-    function checkIfIsMember() public view returns(bool){
-        return addressSaved[msg.sender];
+    function checkIfIsMember(address _member) public view returns(bool){
+        return addressSaved[_member];
     }
 
+    /*function profile(address _member) public onlyMember returns(Member memory){
+        return Member[_member];
+    }*/
 }
